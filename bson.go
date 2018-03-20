@@ -7,12 +7,6 @@
 // Based on gopkg.in/mgo.v2/bson by Gustavo Niemeyer
 // See THIRD-PARTY-NOTICES for original license terms.
 
-// Package mgobson is an implementation of the BSON specification for Go:
-//
-//     http://bsonspec.org
-//
-// It was created as part of the mgo MongoDB driver for Go, but is standalone
-// and may be used on its own without the driver.
 package mgobson
 
 import (
@@ -26,10 +20,25 @@ var (
 	_ bson.Marshaler = (D)(nil)
 	_ bson.Marshaler = (RawD)(nil)
 
-	_ bson.Unmarshaler = (M)(nil)
+	_ bson.Unmarshaler = (*M)(nil)
 	_ bson.Unmarshaler = (*D)(nil)
 	_ bson.Unmarshaler = (*RawD)(nil)
 )
+
+func DocsToArray(docs []interface{}) *bson.Array {
+	array := bson.NewArray()
+
+	for _, doc := range docs {
+		d, err := bson.NewDocumentEncoder().EncodeDocument(doc)
+		if err != nil {
+			panic(err)
+		}
+
+		array.Append(bson.VC.Document(d))
+	}
+
+	return array
+}
 
 func appendToDoc(doc *bson.Document, key string, value interface{}) error {
 	switch v := value.(type) {
@@ -71,6 +80,15 @@ func appendToDoc(doc *bson.Document, key string, value interface{}) error {
 // undefined ordered. See also the bson.D type for an ordered alternative.
 type M map[string]interface{}
 
+func (m M) MarshalBSONDocumentUnsafe() *bson.Document {
+	doc, err := m.MarshalBSONDocument()
+	if err != nil {
+		panic(err)
+	}
+
+	return doc
+}
+
 func (m M) MarshalBSONDocument() (*bson.Document, error) {
 	doc := bson.NewDocument()
 
@@ -88,18 +106,22 @@ func (m M) MarshalBSON() ([]byte, error) {
 	return bson.Marshal(map[string]interface{}(m))
 }
 
-func (m M) UnmarshalBSON(b []byte) error {
-	err := bson.Unmarshal(b, (map[string]interface{})(m))
+func (m *M) UnmarshalBSON(b []byte) error {
+	newM := make(map[string]interface{})
+
+	err := bson.Unmarshal(b, newM)
 	if err != nil {
 		return err
 	}
 
-	for key, val := range m {
+	for key, val := range newM {
 		switch v := val.(type) {
 		case map[string]interface{}:
-			m[key] = M(v)
+			newM[key] = M(v)
 		}
 	}
+
+	*m = newM
 
 	return nil
 }
@@ -112,6 +134,15 @@ func (m M) UnmarshalBSON(b []byte) error {
 // which the elements are defined is important.  If the order is not important,
 // using a map is generally more comfortable. See bson.M and bson.RawD.
 type D []DocElem
+
+func (d D) MarshalBSONDocumentUnsafe() *bson.Document {
+	doc, err := d.MarshalBSONDocument()
+	if err != nil {
+		panic(err)
+	}
+
+	return doc
+}
 
 func (d D) MarshalBSONDocument() (*bson.Document, error) {
 	doc := bson.NewDocument()
@@ -198,6 +229,15 @@ type RawD []RawDocElem
 type RawDocElem struct {
 	Name  string
 	Value Raw
+}
+
+func (r RawD) MarshalBSONDocumentUnsafe() *bson.Document {
+	doc, err := r.MarshalBSONDocument()
+	if err != nil {
+		panic(err)
+	}
+
+	return doc
 }
 
 func (r RawD) MarshalBSONDocument() (*bson.Document, error) {
