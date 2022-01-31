@@ -3,7 +3,5 @@ The MongoDB mgobson wrapper is now officially end-of-life (EOL). No further deve
 
 Users are encouraged to migrate to the [MongoDB Go Driver](https://github.com/mongodb/mongo-go-driver).
 
-
 # mgobson
 Housing a wrapper around mgo's BSON library
-
